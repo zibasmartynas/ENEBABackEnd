@@ -4,7 +4,7 @@ const cors = require('cors')
 const Fuse = require('fuse.js');
 
 const app = express();
-app.use(cors());
+app.use(cors({origin: "https://eneba-front-end.vercel.app/"}));
 app.use(express.json());
 
 
