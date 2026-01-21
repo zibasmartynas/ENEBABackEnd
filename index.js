@@ -4,7 +4,7 @@ const cors = require('cors')
 const Fuse = require('fuse.js');
 
 const app = express();
-app.use(cors({origin: "https://eneba-front-end.vercel.app/"}));
+app.use(cors({origin: "https://eneba-front-end.vercel.app", credentials: true}));
 app.use(express.json());
 
 
@@ -60,6 +60,7 @@ app.get('/list', (req, res)=>{
     })
 })
 
-app.listen(3001, () => {
-    console.log("Server running on port 3001");
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+    console.log("Server running on port ${PORT}");
 });
