@@ -64,7 +64,7 @@ app.get('/item/:id', (req, res) => {
   const { id } = req.params;
 
   // Use parameterized query to prevent SQL injection
-  const sql = "SELECT * FROM items WHERE id = ?";
+  const sql = "SELECT * FROM items WHERE item_id = ?";
 
   db.query(sql, [id], (err, results) => {
     if (err) {
