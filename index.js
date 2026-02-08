@@ -60,6 +60,25 @@ app.get('/list', (req, res)=>{
     })
 })
 
+app.get('/item/:id', (req, res) => {
+  const { id } = req.params;
+
+  // Use parameterized query to prevent SQL injection
+  const sql = "SELECT * FROM items WHERE id = ?";
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+
+    res.json(results[0]); // return the single item
+  });
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log("Server running on port ${PORT}");
