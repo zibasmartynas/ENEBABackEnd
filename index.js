@@ -4,7 +4,28 @@ const cors = require('cors')
 const Fuse = require('fuse.js');
 
 const app = express();
-app.use(cors({origin: "https://eneba-front-end.vercel.app", credentials: true}));
+
+const allowedOrigins = [
+    "https://eneba-front-end.vercel.app",
+    "https://rallyshotfrontend.vercel.app/",
+    "http://localhost:3000" // for local development
+];
+
+app.use(cors({
+    origin: function(origin, callback){
+        // allow requests with no origin (like Postman or curl)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    credentials: true
+}));
+
+/*app.use(cors({origin: "https://eneba-front-end.vercel.app", credentials: true}));*/
 app.use(express.json());
 
 
