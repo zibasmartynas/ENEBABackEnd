@@ -79,6 +79,22 @@ app.get('/item/:id', (req, res) => {
   });
 });
 
+app.get('/allRallies', (req, res) => {
+    const sql = "SELECT * FROM rallies";
+
+    db.query(sql, (err, results)=>{
+        if(err){
+            return res.status(500).json({error: err.message});
+        }
+
+        if(results.length === 0){
+            return res.status(404).json({error: "No rallies found"});
+        }
+
+        res.json(results);
+    });
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log("Server running on port ${PORT}");
