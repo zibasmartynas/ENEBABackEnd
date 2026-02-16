@@ -7,7 +7,7 @@ const app = express();
 
 const allowedOrigins = [
     "https://eneba-front-end.vercel.app",
-    "https://rallyshotfrontend.vercel.app/",
+    "https://rallyshotfrontend.vercel.app",
     "http://localhost:3000" // for local development
 ];
 
