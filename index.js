@@ -53,9 +53,8 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: "uploads",
-    resource_type: "auto", // supports images & videos
-    type: "private",       // ensures files are private
-    format: async (req, file) => "auto",
+    resource_type: "auto",
+    type: "private",
     public_id: (req, file) => Date.now() + "_" + file.originalname
   }
 });
