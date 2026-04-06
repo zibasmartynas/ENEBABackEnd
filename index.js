@@ -304,21 +304,27 @@ app.patch('/users/:id/role', auth, adminOnly, (req, res) => {
 });
 
 app.post("/upload", auth, creatorOnly, parser.array("media"), (req, res) => {
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ error: "No files uploaded" });
+  try {
+    console.log("UPLOAD HIT");
+    console.log("FILES:", req.files);
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "No files uploaded" });
+    }
+
+    const uploadedFiles = req.files.map(f => ({
+      public_id: f.filename || f.public_id,
+      url: f.path,
+      original_name: f.originalname,
+      creator_id: req.user.id
+    }));
+
+    return res.json({ uploadedFiles });
+
+  } catch (err) {
+    console.error("UPLOAD ERROR:", err);
+    return res.status(500).json({ error: err.message });
   }
-
-  // Map files to useful info
-  const uploadedFiles = req.files.map(f => ({
-    public_id: f.filename,   // Cloudinary filename
-    url: f.path,             // private URL (will need signed URL to access)
-    original_name: f.originalname,
-    creator_id: req.user.id
-  }));
-
-  // TODO: save uploadedFiles metadata to your MySQL DB (title, price, creator_id, public_id)
-
-  res.json({ uploadedFiles });
 });
 
 app.get("/signed-url/:public_id", auth, (req, res) => {
@@ -335,6 +341,11 @@ app.get("/signed-url/:public_id", auth, (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+app.use((err, req, res, next) => {
+  console.error("GLOBAL ERROR:", err);
+  res.status(500).json({ error: err.message });
 });
 
 const PORT = process.env.PORT || 3001;
