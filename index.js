@@ -30,7 +30,7 @@ app.use(express.json());
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
-const JWT_SECRET = supersecretkey;
+const JWT_SECRET = "supersecretkey";
 
 function auth(req, res, next) {
     const header = req.headers.authorization;
