@@ -32,6 +32,27 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const JWT_SECRET = "supersecretkey";
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+cloudinary.config({
+  cloud_name: "deyvgd589", // store in .env
+  api_key: "848798133135438",
+  api_secret: "TRaeBHUSGzvB3UPZA4heXYYFU5E"
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "uploads",
+    resource_type: "auto", // supports images & videos
+    type: "private",       // ensures files are private
+    format: async (req, file) => "auto",
+    public_id: (req, file) => Date.now() + "_" + file.originalname
+  }
+});
+
+const parser = require("multer")({ storage });
 
 function auth(req, res, next) {
     const header = req.headers.authorization;
@@ -272,6 +293,40 @@ app.patch('/users/:id/role', auth, adminOnly, (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ message: "User role updated" });
     });
+});
+
+app.post("/upload", auth, creatorOnly, parser.array("media"), (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: "No files uploaded" });
+  }
+
+  // Map files to useful info
+  const uploadedFiles = req.files.map(f => ({
+    public_id: f.filename,   // Cloudinary filename
+    url: f.path,             // private URL (will need signed URL to access)
+    original_name: f.originalname,
+    creator_id: req.user.id
+  }));
+
+  // TODO: save uploadedFiles metadata to your MySQL DB (title, price, creator_id, public_id)
+
+  res.json({ uploadedFiles });
+});
+
+app.get("/signed-url/:public_id", auth, (req, res) => {
+  const { public_id } = req.params;
+
+  try {
+    const signedUrl = cloudinary.url(public_id, {
+      type: "private",
+      sign_url: true,
+      expires_at: Math.floor(Date.now() / 1000) + 60 * 5 // 5 min
+    });
+
+    res.json({ signedUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 3001;
