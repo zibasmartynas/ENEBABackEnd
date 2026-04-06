@@ -225,6 +225,42 @@ app.get('/me', auth, (req, res) => {
     res.json(req.user);
 });
 
+app.get('/users', auth, adminOnly, (req, res) => {
+    const sql = "SELECT user_id AS id, user_email AS email, user_creator AS creator, user_admin AS admin, user_name AS name FROM users";
+    
+    db.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+app.patch('/users/:id/role', auth, adminOnly, (req, res) => {
+    const { id } = req.params;
+    const { admin, creator } = req.body; // send { admin: 1 } or { creator: 0 }
+
+    const fields = [];
+    const values = [];
+
+    if (admin !== undefined) {
+        fields.push("user_admin = ?");
+        values.push(admin);
+    }
+    if (creator !== undefined) {
+        fields.push("user_creator = ?");
+        values.push(creator);
+    }
+
+    if (fields.length === 0) return res.status(400).json({ error: "No role provided" });
+
+    const sql = `UPDATE users SET ${fields.join(", ")} WHERE user_id = ?`;
+    values.push(id);
+
+    db.query(sql, values, (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "User role updated" });
+    });
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log("Server running on port ${PORT}");
