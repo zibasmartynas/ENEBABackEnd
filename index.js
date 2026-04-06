@@ -6,6 +6,40 @@ const Fuse = require('fuse.js');
 const app = express();
 app.use(cors({origin: "https://eneba-front-end.vercel.app", credentials: true}));
 app.use(express.json());
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
+const JWT_SECRET = supersecretkey;
+
+function auth(req, res, next) {
+    const header = req.headers.authorization;
+
+    if (!header) return res.sendStatus(401);
+
+    const token = header.split(" ")[1];
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch {
+        res.sendStatus(403);
+    }
+}
+
+function adminOnly(req, res, next) {
+    if (req.user.admin !== 1) {
+        return res.sendStatus(403);
+    }
+    next();
+}
+
+function creatorOnly(req, res, next) {
+    if (req.user.creator !== 1) {
+        return res.sendStatus(403);
+    }
+    next();
+}
 
 
 const db = mysql.createPool({
@@ -93,6 +127,81 @@ app.get('/allRallies', (req, res) => {
 
         res.json(results);
     });
+});
+
+app.post('/register', async (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ error: "Missing fields" });
+    }
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        db.query(
+            `INSERT INTO users (user_email, user_password, user_creator, user_admin)
+             VALUES (?, ?, 0, 0)`,
+            [email, hashedPassword],
+            (err, result) => {
+                if (err) {
+                    return res.status(500).json({ error: "User exists or DB error" });
+                }
+
+                res.json({ message: "User registered" });
+            }
+        );
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/login', (req, res) => {
+    const { email, password } = req.body;
+
+    db.query(
+        "SELECT * FROM users WHERE user_email = ?",
+        [email],
+        async (err, results) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            if (results.length === 0) {
+                return res.status(400).json({ error: "Invalid credentials" });
+            }
+
+            const user = results[0];
+
+            const valid = await bcrypt.compare(password, user.user_password);
+
+            if (!valid) {
+                return res.status(400).json({ error: "Invalid credentials" });
+            }
+
+            const token = jwt.sign(
+                {
+                    id: user.user_id,
+                    creator: user.user_creator,
+                    admin: user.user_admin
+                },
+                JWT_SECRET,
+                { expiresIn: "7d" }
+            );
+
+            res.json({ token });
+        }
+    );
+});
+
+app.get('/admin-data', auth, adminOnly, (req, res) => {
+    res.json({ message: "Admin only data" });
+});
+
+app.get('/creator-data', auth, creatorOnly, (req, res) => {
+    res.json({ message: "Creator only data" });
+});
+
+app.get('/me', auth, (req, res) => {
+    res.json(req.user);
 });
 
 const PORT = process.env.PORT || 3001;
