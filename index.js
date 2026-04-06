@@ -226,7 +226,7 @@ app.get('/me', auth, (req, res) => {
 });
 
 app.get('/users', auth, adminOnly, (req, res) => {
-    const sql = "SELECT user_id AS id, user_email AS email, user_creator AS creator, user_admin AS admin, user_name AS name FROM users";
+    const sql = "SELECT user_id AS id, user_email AS email, user_creator AS creator, user_admin AS admin FROM users";
     
     db.query(sql, (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
