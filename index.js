@@ -152,30 +152,42 @@ app.get('/allRallies', (req, res) => {
 });
 
 app.post('/register', async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({ error: "Missing fields" });
-    }
+  if (!email || !password) {
+    return res.status(400).json({ error: "Missing fields" });
+  }
 
-    try {
+  try {
+    // Check if email already exists
+    db.query(
+      "SELECT * FROM users WHERE user_email = ?",
+      [email],
+      async (err, results) => {
+        if (err) return res.status(500).json({ error: "Database error" });
+
+        if (results.length > 0) {
+          return res.status(400).json({ error: "Email already registered" });
+        }
+
+        // Email not found, proceed to insert
         const hashedPassword = await bcrypt.hash(password, 10);
 
         db.query(
-            `INSERT INTO users (user_email, user_password, user_creator, user_admin)
-             VALUES (?, ?, 0, 0)`,
-            [email, hashedPassword],
-            (err, result) => {
-                if (err) {
-                    return res.status(500).json({ error: "User exists or DB error" });
-                }
+          `INSERT INTO users (user_email, user_password, user_creator, user_admin)
+           VALUES (?, ?, 0, 0)`,
+          [email, hashedPassword],
+          (err, result) => {
+            if (err) return res.status(500).json({ error: "Database error" });
 
-                res.json({ message: "User registered" });
-            }
+            res.json({ message: "User registered successfully" });
+          }
         );
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/login', (req, res) => {
