@@ -5,6 +5,11 @@ const Fuse = require('fuse.js');
 
 const app = express();
 
+app.options("*", cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
 const allowedOrigins = [
     "https://eneba-front-end.vercel.app",
     "https://rallyshotfrontend.vercel.app",
@@ -331,5 +336,5 @@ app.get("/signed-url/:public_id", auth, (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-    console.log("Server running on port ${PORT}");
+    console.log('Server running on port ${PORT}');
 });
