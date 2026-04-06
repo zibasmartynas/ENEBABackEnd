@@ -8,7 +8,8 @@ const app = express();
 const allowedOrigins = [
     "https://eneba-front-end.vercel.app",
     "https://rallyshotfrontend.vercel.app",
-    "http://localhost:3000" // for local development
+    "http://localhost:3000", // for local development
+    "http://192.168.1.247:3000"
 ];
 
 app.use(cors({
