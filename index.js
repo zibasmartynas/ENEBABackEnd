@@ -5,10 +5,7 @@ const Fuse = require('fuse.js');
 
 const app = express();
 
-app.options("*", cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
+
 
 const allowedOrigins = [
     "https://eneba-front-end.vercel.app",
@@ -16,6 +13,12 @@ const allowedOrigins = [
     "http://localhost:3000", // for local development
     "http://192.168.1.247:3000"
 ];
+
+
+app.options("*", cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 
 app.use(cors({
     origin: function(origin, callback){
