@@ -366,6 +366,38 @@ app.get("/signed-url/:public_id", auth, (req, res) => {
   }
 });
 
+app.get("/photos-with-urls/:rally_id", auth, (req, res) => {
+  const { rally_id } = req.params;
+
+  db.query("SELECT * FROM photo WHERE rally_id = ?", [rally_id], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const result = rows.map(photo => {
+      const signedUrl = cloudinary.url(photo.public_id, {
+        type: "private",
+        sign_url: true,
+        expires_at: Math.floor(Date.now() / 1000) + 300
+      });
+
+      return { ...photo, signedUrl };
+    });
+
+    res.json(result);
+  });
+});
+
+app.get("/photos/:rally_id", auth, (req, res) => {
+  const { rally_id } = req.params;
+
+  const sql = "SELECT * FROM photo WHERE rally_id = ?";
+
+  db.query(sql, [rally_id], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    res.json(results);
+  });
+});
+
 app.use((err, req, res, next) => {
   console.error("GLOBAL ERROR:", err);
   res.status(500).json({ error: err.message });
