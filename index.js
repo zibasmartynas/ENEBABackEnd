@@ -304,8 +304,11 @@ app.patch('/users/:id/role', auth, adminOnly, (req, res) => {
 
 app.post("/upload", auth, creatorOnly, parser.array("media"), (req, res) => {
   try {
-    console.log("UPLOAD HIT");
-    console.log("FILES:", req.files);
+    const { rally_id, price } = req.body;
+
+    if (!rally_id || !price) {
+      return res.status(400).json({ error: "Missing rally_id or price" });
+    }
 
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: "No files uploaded" });
@@ -318,7 +321,28 @@ app.post("/upload", auth, creatorOnly, parser.array("media"), (req, res) => {
       creator_id: req.user.id
     }));
 
-    return res.json({ uploadedFiles });
+    // 🔥 INSERT with public_id
+    const values = uploadedFiles.map(f => [
+      rally_id,
+      req.user.id,
+      price,
+      f.public_id,
+      f.original_name
+    ]);
+
+    const sql = `
+      INSERT INTO photo (rally_id, user_id, price, public_id, original_name)
+      VALUES ?
+    `;
+
+    db.query(sql, [values], (err) => {
+      if (err) {
+        console.error("DB INSERT ERROR:", err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      return res.json({ uploadedFiles });
+    });
 
   } catch (err) {
     console.error("UPLOAD ERROR:", err);
