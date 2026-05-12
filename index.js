@@ -345,8 +345,9 @@ app.post("/upload", auth, creatorOnly, parser.array("media"), (req, res) => {
     }
 
     const uploadedFiles = req.files.map(f => ({
-      public_id: f.filename || f.public_id,
-      url: f.path,
+      public_id: f.public_id,
+      //url: f.path,
+      url: f.secure_url,
       original_name: f.originalname,
       creator_id: req.user.id
     }));
