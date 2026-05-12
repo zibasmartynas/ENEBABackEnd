@@ -281,3 +281,28 @@ app.get("/allRallies", (req, res) => {
     res.json(results);
   });
 });
+
+app.get("/list-photos", (req, res) => {
+  db.query("SELECT * FROM photo", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const result = rows.map(photo => ({
+      id: photo.id,
+      rally_id: photo.rally_id,
+      user_id: photo.user_id,
+      price: photo.price,
+      public_id: photo.public_id,
+      original_name: photo.original_name,
+
+      signedUrl: cloudinary.url(photo.public_id, {
+        type: "private",
+        sign_url: true,
+        resource_type: "auto",
+        secure: true,
+        expires_at: Math.floor(Date.now() / 1000) + 300
+      })
+    }));
+
+    res.json(result);
+  });
+});
