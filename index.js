@@ -263,3 +263,11 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+app.get("/me", auth, (req, res) => {
+  res.json({
+    id: req.user.id,
+    creator: req.user.creator,
+    admin: req.user.admin
+  });
+});
