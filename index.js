@@ -126,6 +126,28 @@ let sql = "SELECT * FROM items";
     });
 });*/
 
+app.get("/photos-with-urls", auth, (req, res) => {
+
+  db.query("SELECT * FROM photo", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const result = rows.map(photo => {
+      const signedUrl = cloudinary.url(photo.public_id, {
+        type: "private",
+        sign_url: true,
+        expires_at: Math.floor(Date.now() / 1000) + 300
+      });
+
+      return {
+        ...photo,
+        signedUrl
+      };
+    });
+
+    res.json(result);
+  });
+});
+
 app.get('/list', (req, res)=>{
     const search = req.query.search || '';
 
