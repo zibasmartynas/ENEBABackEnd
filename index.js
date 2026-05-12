@@ -132,11 +132,19 @@ app.get("/photos-with-urls", auth, (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
 
     const result = rows.map(photo => {
-      const signedUrl = cloudinary.url(photo.public_id, {
+      /*const signedUrl = cloudinary.url(photo.public_id, {
         type: "private",
         sign_url: true,
         expires_at: Math.floor(Date.now() / 1000) + 300
-      });
+      });*/
+
+      const signedUrl = cloudinary.url(photo.public_id, {
+  type: "private",
+  sign_url: true,
+  resource_type: "image",
+  secure: true,
+  expires_at: Math.floor(Date.now() / 1000) + 300,
+});
 
       return {
         ...photo,
@@ -395,11 +403,18 @@ app.get("/photos-with-urls/:rally_id", auth, (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
 
     const result = rows.map(photo => {
-      const signedUrl = cloudinary.url(photo.public_id, {
+      /*const signedUrl = cloudinary.url(photo.public_id, {
         type: "private",
         sign_url: true,
         expires_at: Math.floor(Date.now() / 1000) + 300
-      });
+      });*/
+      const signedUrl = cloudinary.url(photo.public_id, {
+  type: "private",
+  sign_url: true,
+  resource_type: "image",
+  secure: true,
+  expires_at: Math.floor(Date.now() / 1000) + 300,
+});
 
       return { ...photo, signedUrl };
     });
