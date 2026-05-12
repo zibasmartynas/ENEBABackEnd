@@ -271,3 +271,13 @@ app.get("/me", auth, (req, res) => {
     admin: req.user.admin
   });
 });
+
+app.get("/allRallies", (req, res) => {
+  db.query("SELECT * FROM rallies", (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    res.json(results);
+  });
+});
