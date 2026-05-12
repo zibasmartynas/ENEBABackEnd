@@ -48,7 +48,8 @@ const storage = new CloudinaryStorage({
     folder: "uploads",
     resource_type: "image",
     type: "upload",
-    public_id: (req, file) => Date.now() + "_" + file.originalname
+    public_id: (req, file) =>
+      `rallies/${Date.now()}_${file.originalname.split(".")[0]}`
   }
 });
 
@@ -178,9 +179,11 @@ app.get("/photos", (req, res) => {
 
     const result = rows.map(photo => ({
       ...photo,
+
       url: cloudinary.url(photo.public_id, {
         secure: true,
-        resource_type: "image"
+        resource_type: "image",
+        type: "upload"
       })
     }));
 
@@ -221,7 +224,7 @@ app.post("/upload", auth, creatorOnly, upload.array("media"), (req, res) => {
     rally_id,
     req.user.id,
     price,
-    f.filename,
+    f.path,
     f.originalname
   ]);
 
