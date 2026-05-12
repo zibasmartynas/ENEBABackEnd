@@ -34,19 +34,20 @@ app.use(express.json());
 // ================= AUTH =================
 const JWT_SECRET = "supersecretkey";
 
-// ================= CLOUDINARY =================
+// ================= CLOUDINARY (FIXED) =================
 cloudinary.config({
   cloud_name: "deyvgd589",
   api_key: "848798133135438",
   api_secret: "TRaeBHUSGzvB3UPZA4heXYYFU5E"
 });
 
+// 🔥 FIXED: no auto, no private
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: "uploads",
-    resource_type: "auto",
-    type: "private",
+    resource_type: "image",
+    type: "upload",
     public_id: (req, file) => Date.now() + "_" + file.originalname
   }
 });
@@ -82,12 +83,7 @@ function creatorOnly(req, res, next) {
   next();
 }
 
-function adminOnly(req, res, next) {
-  if (req.user.admin !== 1) return res.sendStatus(403);
-  next();
-}
-
-// ================= LOGIN (FIXED - IMPORTANT) =================
+// ================= LOGIN =================
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
 
@@ -97,17 +93,15 @@ app.post('/login', (req, res) => {
     async (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      if (results.length === 0) {
+      if (results.length === 0)
         return res.status(400).json({ error: "Invalid credentials" });
-      }
 
       const user = results[0];
 
       const valid = await bcrypt.compare(password, user.user_password);
 
-      if (!valid) {
+      if (!valid)
         return res.status(400).json({ error: "Invalid credentials" });
-      }
 
       const token = jwt.sign(
         {
@@ -131,9 +125,8 @@ app.post('/register', async (req, res) => {
   db.query("SELECT * FROM users WHERE user_email = ?", [email], async (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
 
-    if (results.length > 0) {
+    if (results.length > 0)
       return res.status(400).json({ error: "Email already exists" });
-    }
 
     const hashed = await bcrypt.hash(password, 10);
 
@@ -148,13 +141,12 @@ app.post('/register', async (req, res) => {
   });
 });
 
-// ================= ITEMS (FIXED FUSE BUG) =================
+// ================= ITEMS =================
 app.get('/list', (req, res) => {
-  const search = req.query.search || '';
-
   db.query("SELECT * FROM items", (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
+    const search = req.query.search || '';
     if (!search) return res.json(rows);
 
     const fuse = new Fuse(rows, {
@@ -162,9 +154,7 @@ app.get('/list', (req, res) => {
       threshold: 0.7
     });
 
-    const result = fuse.search(search);
-
-    res.json(result.map(r => r.item ?? r));
+    res.json(fuse.search(search).map(r => r.item));
   });
 });
 
@@ -181,19 +171,16 @@ app.get('/item/:id', (req, res) => {
   );
 });
 
-// ================= PHOTOS (MAIN FIX) =================
-app.get("/photos", auth, (req, res) => {
+// ================= PHOTOS =================
+app.get("/photos", (req, res) => {
   db.query("SELECT * FROM photo", (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
     const result = rows.map(photo => ({
       ...photo,
-      signedUrl: cloudinary.url(photo.public_id, {
-        type: "private",
-        sign_url: true,
-        resource_type: "image",
+      url: cloudinary.url(photo.public_id, {
         secure: true,
-        expires_at: Math.floor(Date.now() / 1000) + 300
+        resource_type: "image"
       })
     }));
 
@@ -202,7 +189,7 @@ app.get("/photos", auth, (req, res) => {
 });
 
 // ================= PHOTOS BY RALLY =================
-app.get("/photos/:rally_id", auth, (req, res) => {
+app.get("/photos/:rally_id", (req, res) => {
   db.query(
     "SELECT * FROM photo WHERE rally_id = ?",
     [req.params.rally_id],
@@ -211,12 +198,9 @@ app.get("/photos/:rally_id", auth, (req, res) => {
 
       const result = rows.map(photo => ({
         ...photo,
-        signedUrl: cloudinary.url(photo.public_id, {
-          type: "private",
-          sign_url: true,
-          resource_type: "image",
+        url: cloudinary.url(photo.public_id, {
           secure: true,
-          expires_at: Math.floor(Date.now() / 1000) + 300
+          resource_type: "image"
         })
       }));
 
@@ -233,18 +217,12 @@ app.post("/upload", auth, creatorOnly, upload.array("media"), (req, res) => {
     return res.status(400).json({ error: "Missing data" });
   }
 
-  const uploadedFiles = req.files.map(f => ({
-    public_id: f.filename,
-    url: f.path,
-    original_name: f.originalname
-  }));
-
-  const values = uploadedFiles.map(f => [
+  const values = req.files.map(f => [
     rally_id,
     req.user.id,
     price,
-    f.public_id,
-    f.original_name
+    f.filename,
+    f.originalname
   ]);
 
   db.query(
@@ -252,18 +230,42 @@ app.post("/upload", auth, creatorOnly, upload.array("media"), (req, res) => {
     [values],
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ uploadedFiles });
+      res.json({ success: true });
     }
   );
 });
 
-// ================= SERVER =================
-const PORT = process.env.PORT || 3001;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// ================= ALL RALLIES =================
+app.get("/allRallies", (req, res) => {
+  db.query("SELECT * FROM rallies", (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
 });
 
+// ================= LIST PHOTOS (FRONT PAGE) =================
+app.get("/list-photos", (req, res) => {
+  db.query("SELECT * FROM photo", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const result = rows.map(photo => ({
+      id: photo.id,
+      rally_id: photo.rally_id,
+      price: photo.price,
+      public_id: photo.public_id,
+      original_name: photo.original_name,
+
+      url: cloudinary.url(photo.public_id, {
+        secure: true,
+        resource_type: "image"
+      })
+    }));
+
+    res.json(result);
+  });
+});
+
+// ================= ME =================
 app.get("/me", auth, (req, res) => {
   res.json({
     id: req.user.id,
@@ -272,37 +274,9 @@ app.get("/me", auth, (req, res) => {
   });
 });
 
-app.get("/allRallies", (req, res) => {
-  db.query("SELECT * FROM rallies", (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
+// ================= SERVER =================
+const PORT = process.env.PORT || 3001;
 
-    res.json(results);
-  });
-});
-
-app.get("/list-photos", (req, res) => {
-  db.query("SELECT * FROM photo", (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-
-    const result = rows.map(photo => ({
-      id: photo.id,
-      rally_id: photo.rally_id,
-      user_id: photo.user_id,
-      price: photo.price,
-      public_id: photo.public_id,
-      original_name: photo.original_name,
-
-      signedUrl: cloudinary.url(photo.public_id, {
-        type: "private",
-        sign_url: true,
-        resource_type: "auto",
-        secure: true,
-        expires_at: Math.floor(Date.now() / 1000) + 300
-      })
-    }));
-
-    res.json(result);
-  });
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
