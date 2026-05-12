@@ -2,20 +2,16 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const Fuse = require('fuse.js');
-
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const cloudinary = require('cloudinary').v2;
-const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-
 require('dotenv').config();
+
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const multer = require("multer");
 
 const app = express();
 
-app.use(express.json());
-
-// ================= CORS (UNCHANGED STYLE) =================
 const allowedOrigins = [
   "https://eneba-front-end.vercel.app",
   "https://rallyshotfrontend.vercel.app",
@@ -26,57 +22,45 @@ const allowedOrigins = [
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
   },
   credentials: true
 }));
 
+app.use(express.json());
+
 // ================= CLOUDINARY =================
+const JWT_SECRET = "supersecretkey";
+
 cloudinary.config({
   cloud_name: "deyvgd589",
   api_key: "848798133135438",
   api_secret: "TRaeBHUSGzvB3UPZA4heXYYFU5E"
 });
 
-// FIXED STORAGE (same structure, only safe + correct)
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: "uploads",
     resource_type: "auto",
-    type: "upload", // ✅ FIXED (was "private" causing 404 issues)
-    public_id: (req, file) =>
-      Date.now() + "_" + file.originalname
+    type: "private",
+    public_id: (req, file) => Date.now() + "_" + file.originalname
   }
 });
 
-const upload = multer({ storage });
+const parser = multer({ storage });
 
-// ================= MYSQL (FIXED TYPE SAFETY ONLY) =================
+// ================= DB =================
 const db = mysql.createPool({
   host: 'tramway.proxy.rlwy.net',
-  port: 17541,
+  port: '17541',
   user: 'root',
   password: 'tsfcyHKdvYkyVplEDiZTHRyhQzqyZpTK',
   database: 'railway'
 });
 
-db.getConnection((err, connection) => {
-  if (err) {
-    console.error("Error connecting to MySQL:", err);
-  } else {
-    console.log("Connected to MySQL!");
-    connection.release();
-  }
-});
-
 // ================= AUTH =================
-const JWT_SECRET = "supersecretkey";
-
 function auth(req, res, next) {
   const header = req.headers.authorization;
   if (!header) return res.sendStatus(401);
@@ -91,89 +75,82 @@ function auth(req, res, next) {
   }
 }
 
-// ================= SIGNED URL =================
-function getSignedUrl(public_id) {
-  return cloudinary.url(public_id, {
-    type: "upload", // ✅ FIXED (was "private")
-    resource_type: "auto",
-    sign_url: true,
-    secure: true,
-    expires_at: Math.floor(Date.now() / 1000) + 300
-  });
+function creatorOnly(req, res, next) {
+  if (req.user.creator !== 1) return res.sendStatus(403);
+  next();
 }
 
-// ================= ROUTES =================
+// ================= UPLOAD =================
+app.post("/upload", auth, creatorOnly, parser.array("media"), (req, res) => {
+  const { rally_id, price } = req.body;
 
-// LIST (SAFE)
-app.get('/list', (req, res) => {
-  const search = req.query.search || '';
+  if (!rally_id || !price) {
+    return res.status(400).json({ error: "Missing data" });
+  }
 
-  db.query("SELECT * FROM items", (err, rows) => {
-    if (err) return res.json([]);
+  const uploadedFiles = req.files.map(f => ({
+    public_id: f.filename,
+    url: f.path,
+    original_name: f.originalname
+  }));
 
-    if (!search) return res.json(rows);
+  const values = uploadedFiles.map(f => [
+    rally_id,
+    req.user.id,
+    price,
+    f.public_id,
+    f.original_name
+  ]);
 
-    const fuse = new Fuse(rows, {
-      keys: ['item_name'],
-      threshold: 0.7,
-    });
+  db.query(
+    `INSERT INTO photo (rally_id, user_id, price, public_id, original_name) VALUES ?`,
+    [values],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ uploadedFiles });
+    }
+  );
+});
 
-    res.json(fuse.search(search).map(r => r.item));
+// ================= PHOTOS (MAIN FIX) =================
+
+// GET ALL PHOTOS
+app.get("/photos", auth, (req, res) => {
+  db.query("SELECT * FROM photo", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const result = rows.map(photo => ({
+      ...photo,
+      signedUrl: cloudinary.url(photo.public_id, {
+        type: "private",
+        sign_url: true,
+        resource_type: "image",
+        secure: true,
+        expires_at: Math.floor(Date.now() / 1000) + 300
+      })
+    }));
+
+    res.json(result);
   });
 });
 
-// ================= UPLOAD =================
-app.post("/upload", auth, upload.array("media"), (req, res) => {
-  try {
-    const { rally_id, price } = req.body;
-
-    if (!rally_id || !price) {
-      return res.status(400).json({ error: "Missing fields" });
-    }
-
-    const files = req.files.map(f => ({
-      public_id: f.filename,
-      url: f.path
-    }));
-
-    const values = files.map(f => [
-      rally_id,
-      req.user.id,
-      price,
-      f.public_id
-    ]);
-
-    db.query(
-      "INSERT INTO photo (rally_id, user_id, price, public_id) VALUES ?",
-      [values],
-      (err) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ error: err.message });
-        }
-
-        res.json({ uploadedFiles: files });
-      }
-    );
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ================= PHOTOS =================
-app.get("/photos-with-urls/:rally_id", auth, (req, res) => {
-  const { rally_id } = req.params;
-
+// GET BY RALLY
+app.get("/photos/:rally_id", auth, (req, res) => {
   db.query(
     "SELECT * FROM photo WHERE rally_id = ?",
-    [rally_id],
+    [req.params.rally_id],
     (err, rows) => {
-      if (err) return res.json([]);
+      if (err) return res.status(500).json({ error: err.message });
 
       const result = rows.map(photo => ({
         ...photo,
-        signedUrl: getSignedUrl(photo.public_id)
+        signedUrl: cloudinary.url(photo.public_id, {
+          type: "private",
+          sign_url: true,
+          resource_type: "image",
+          secure: true,
+          expires_at: Math.floor(Date.now() / 1000) + 300
+        })
       }));
 
       res.json(result);
@@ -181,16 +158,27 @@ app.get("/photos-with-urls/:rally_id", auth, (req, res) => {
   );
 });
 
-// ================= SINGLE SIGNED URL =================
-app.get("/signed-url/:public_id", auth, (req, res) => {
-  res.json({
-    signedUrl: getSignedUrl(req.params.public_id)
+// ================= ITEMS (unchanged) =================
+app.get('/list', (req, res) => {
+  const search = req.query.search || '';
+
+  db.query("SELECT * FROM items", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    if (!search) return res.json(rows);
+
+    const fuse = new Fuse(rows, {
+      keys: ['item_name'],
+      threshold: 0.7
+    });
+
+    res.json(fuse.search(search).map(r => r.item));
   });
 });
 
 // ================= SERVER =================
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
-  console.log("Server running on port 3001");
+  console.log(`Server running on port ${PORT}`);
 });
